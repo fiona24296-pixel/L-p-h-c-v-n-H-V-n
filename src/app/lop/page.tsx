@@ -88,6 +88,14 @@ function ClassesView() {
       </div>
 
       <div className="space-y-2 px-4">
+        {current && (
+          <Link href={`/buoi-hoc?lop=${current.id}`} className="block">
+            <Card className="flex items-center justify-between !bg-brand-50 !p-3 active:bg-brand-100">
+              <span className="font-semibold text-brand-800">📋 Các buổi học &amp; xuất Excel điểm danh</span>
+              <span className="text-xl text-brand-400">›</span>
+            </Card>
+          </Link>
+        )}
         {students.length === 0 ? (
           <EmptyState title="Chưa có học sinh nào">
             <p>Cô vào <Link href="/cai-dat" className="font-semibold text-brand-700 underline">Cài đặt → Nhập từ Excel</Link> để đưa danh sách vào app, hoặc bấm &quot;Thêm&quot;.</p>

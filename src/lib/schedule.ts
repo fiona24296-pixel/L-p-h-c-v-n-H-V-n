@@ -81,3 +81,17 @@ export function sessionsOnWeekday(classes: ClassRoom[], weekday: number): TodayS
     .flatMap((c) => c.schedule.filter((s) => s.weekday === weekday).map((slot) => ({ classRoom: c, slot })))
     .sort((a, b) => a.slot.start.localeCompare(b.slot.start));
 }
+
+/** Các ngày học theo lịch của lớp trong khoảng [from, to] (YYYY-MM-DD). */
+export function scheduledDates(classRoom: ClassRoom, from: string, to: string): { date: string; slot: ScheduleSlot }[] {
+  const out: { date: string; slot: ScheduleSlot }[] = [];
+  const [y1, m1, d1] = from.split("-").map(Number);
+  const [y2, m2, d2] = to.split("-").map(Number);
+  const end = Date.UTC(y2, m2 - 1, d2);
+  for (let t = Date.UTC(y1, m1 - 1, d1); t <= end; t += 86_400_000) {
+    const d = new Date(t);
+    const iso = d.toISOString().slice(0, 10);
+    for (const slot of classRoom.schedule) if (slot.weekday === d.getUTCDay()) out.push({ date: iso, slot });
+  }
+  return out.sort((a, b) => (a.date + a.slot.start).localeCompare(b.date + b.slot.start));
+}

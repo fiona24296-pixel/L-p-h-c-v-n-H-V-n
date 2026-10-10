@@ -55,12 +55,15 @@ Khi cần cô thao tác (tạo tài khoản, lấy khóa, deploy) → hướng d
 - Văn phong nhận xét mẫu của cô: `docs/van-phong-nhan-xet.md` (dùng cho Giai đoạn 3).
 
 ## Mô hình dữ liệu Firestore
-- `settings/main`: thông tin GV, ngân hàng, câu cảm ơn, mức học phí, kỳ thu, quy tắc vắng, thẻ nhận xét.
+- `settings/main`: commentTags (đã có), feePeriods (đã có); sắp tới: thông tin GV, ngân hàng, câu cảm ơn, mức học phí, kỳ thu, quy tắc vắng, thẻ nhận xét.
 - `classes/{classId}`: tên, khối (tieu_hoc | 6 | 7 | 8 | 9), lịch [{thứ, giờ bắt đầu, giờ kết thúc}], học phí theo tháng hay theo buổi.
 - `students/{maHS}`: họ tên, classId, khối, trường, lớp ở trường, phụ huynh, zalo, sđt, cách tính học phí, ghi chú,
   cần kiểm tra, trạng thái (đang học / nghỉ học), % miễn giảm, ngày vào học.
-- `sessions/{classId_YYYY-MM-DD_HHmm}`: lớp, ngày, giờ, loại (chinh_thuc | bo_tro | hoc_bu), nghỉ cả lớp, nội dung, BTVN,
-  `records: { [maHS]: { status, btvn, yThuc, diem, the[], ghiChu, nhanXet } }`.
+- `sessions/{classId_YYYY-MM-DD_HHmm}`: classId, date, start, end, type (official | support | makeup), cancelled,
+  content, homeworkText, testName (trống = không KT), testParts (["Tập làm văn","Tiếng Việt"] / ["Điểm"]),
+  `records: { [maHS]: { status (present|excused|unexcused|makeup), homework (0|30|50|70|100|null), attitude, scores{phần: điểm}, tags[], note, comment, guest? } }`.
+  Ghi từng phần bằng `setDoc(merge)` (`patchSession`) để 2 máy sửa 2 em khác nhau không đè nhau.
+  Truy vấn theo lớp + khoảng ngày dùng `documentId()` range (không cần composite index).
 - `periodComments/{kỳ_maHS}`: nhận xét định kỳ.
 - `roadmaps/{khối_YYYY-MM}`: lộ trình tháng theo khối.
 - `fees/{kỳ_maHS}`: điều chỉnh tay (+/- tiền, lý do), trạng thái đóng, các lần đóng [{ngày, số tiền}].
@@ -95,6 +98,11 @@ Khi cần cô thao tác (tạo tài khoản, lấy khóa, deploy) → hướng d
   báo "không có quyền"), PWA (manifest + `public/sw.js`), nhập Excel (xem trước → nhập, upsert theo Mã HS),
   danh sách học sinh (lọc lớp, tìm không dấu, ⚠ cần kiểm tra, đã nghỉ), thêm/sửa/xóa/chuyển lớp/nghỉ học,
   Hôm nay (ca theo lịch), Cài đặt (nhập/tải Excel, lịch lớp, đăng xuất). **Chờ cô duyệt + tạo Firebase.**
+- [x] Giai đoạn 2 — `/diem-danh?lop=&ngay=&gio=` (mở ca lần đầu tự tạo buổi, cả lớp Có mặt; chạm ô trạng thái để đổi vòng
+  Có mặt → Vắng P → Vắng KP → Học bù; Nghỉ cả lớp; loại buổi; nội dung + BTVN; bài KT nhiều phần điểm; bảng chi tiết từng em
+  có Em trước/Em sau; Áp dụng cho cả lớp (chỉ em có mặt); sửa thẻ; thêm HS lớp khác học bù; em mới vào lớp → nút "Thêm vào"),
+  `/buoi-hoc?lop=` (buổi theo kỳ 2 tháng, gộp lịch chưa điểm danh, thêm buổi khác lịch, xuất Excel "*"/"Vắng"/"-"/"Nghỉ").
+  Hôm nay hiện "Đã điểm danh: có mặt x/y". Kiểm thử: `e2e/phase2.mjs` (có kiểm tra đồng bộ 2 máy). **Chờ cô duyệt.**
 - Ghi theo kiểu "lạc quan": ghi vào bộ nhớ đệm Firestore rồi đóng form ngay (mạng yếu vẫn dùng được).
 - Câu hỏi còn chờ cô trả lời: email đăng nhập (đang giả định Gmail của tài khoản Claude của cô — không ghi vào repo), quy tắc "buổi lẻ" THCS,
   "Học bù" tính như có mặt?, Vercel, có deploy sớm để thử trên điện thoại không.

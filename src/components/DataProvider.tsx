@@ -1,16 +1,20 @@
 "use client";
 
-import { collection, onSnapshot } from "firebase/firestore";
+import { collection, doc, onSnapshot } from "firebase/firestore";
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { COL, seedDefaultClasses, toStudent } from "@/lib/db";
+import { COL, SETTINGS_DOC, seedDefaultClasses, toStudent } from "@/lib/db";
+import { DEFAULT_FEE_PERIODS } from "@/lib/periods";
+import { DEFAULT_COMMENT_TAGS } from "@/lib/session";
 import { getDb } from "@/lib/firebase";
-import type { ClassRoom, Student } from "@/lib/types";
+import type { AppSettings, ClassRoom, Student } from "@/lib/types";
 
 interface Data {
   loading: boolean;
   classes: ClassRoom[];
   students: Student[];
   classById: Map<string, ClassRoom>;
+  studentById: Map<string, Student>;
+  settings: AppSettings;
   error?: string;
 }
 
@@ -26,6 +30,7 @@ export function useData() {
 export function DataProvider({ children }: { children: React.ReactNode }) {
   const [classes, setClasses] = useState<ClassRoom[] | null>(null);
   const [students, setStudents] = useState<Student[] | null>(null);
+  const [settingsData, setSettingsData] = useState<Partial<AppSettings>>({});
   const [error, setError] = useState<string>();
   const seeded = useRef(false);
 
@@ -53,7 +58,9 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       },
       onErr,
     );
+    const unsubSettings = onSnapshot(doc(db, ...SETTINGS_DOC), (snap) => setSettingsData(snap.data() ?? {}), onErr);
     return () => {
+      unsubSettings();
       unsubClasses();
       unsubStudents();
     };
@@ -61,14 +68,20 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
   const value = useMemo<Data>(() => {
     const cls = classes ?? [];
+    const sts = students ?? [];
     return {
       loading: classes === null || students === null,
       classes: cls,
-      students: students ?? [],
+      students: sts,
       classById: new Map(cls.map((c) => [c.id, c])),
+      studentById: new Map(sts.map((s) => [s.id, s])),
+      settings: {
+        commentTags: settingsData.commentTags ?? DEFAULT_COMMENT_TAGS,
+        feePeriods: settingsData.feePeriods ?? DEFAULT_FEE_PERIODS,
+      },
       error,
     };
-  }, [classes, students, error]);
+  }, [classes, students, settingsData, error]);
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
 }

@@ -3,16 +3,22 @@
 import {
   collection,
   deleteDoc,
+  deleteField,
   doc,
+  documentId,
+  FieldPath,
   getDocsFromServer,
+  query,
   setDoc,
+  updateDoc,
+  where,
   writeBatch,
   type Firestore,
 } from "firebase/firestore";
 import { DEFAULT_CLASSES } from "./defaults";
 import type { ImportResult } from "./excel-import";
 import { getDb } from "./firebase";
-import type { ClassRoom, Student } from "./types";
+import type { AppSettings, ClassRoom, ClassSession, Student } from "./types";
 
 export const COL = {
   classes: "classes",
@@ -105,4 +111,48 @@ export async function applyImport(result: ImportResult, existing: Student[], exi
   }
   await commitInChunks(db, ops);
   return { created, updated, classesWritten };
+}
+
+// ───────────── Cài đặt & buổi học (Giai đoạn 2) ─────────────
+
+export const SETTINGS_DOC = ["settings", "main"] as const;
+
+export async function saveSettings(patch: Partial<AppSettings>) {
+  await setDoc(doc(getDb(), ...SETTINGS_DOC), patch, { merge: true });
+}
+
+export function sessionRef(id: string) {
+  return doc(getDb(), "sessions", id);
+}
+
+/** Tạo buổi (nếu chưa có). */
+export async function createSession(s: ClassSession) {
+  const { id, ...data } = s;
+  await setDoc(sessionRef(id), { ...data, updatedAt: Date.now() }, { merge: true });
+}
+
+/**
+ * Ghi một phần của buổi, ví dụ { content: "…" } hoặc { records: { "V6-01": { status: "excused" } } }.
+ * merge: true gộp sâu các map nên 2 máy sửa 2 em khác nhau không đè lên nhau.
+ */
+export function patchSession(id: string, patch: Record<string, unknown>) {
+  return setDoc(sessionRef(id), { ...patch, updatedAt: Date.now() }, { merge: true });
+}
+
+/** Xóa hẳn 1 em khỏi buổi (ví dụ thêm nhầm học sinh học bù). */
+export function removeFromSession(id: string, studentId: string) {
+  return updateDoc(sessionRef(id), new FieldPath("records", studentId), deleteField(), "updatedAt", Date.now());
+}
+
+export function deleteSession(id: string) {
+  return deleteDoc(sessionRef(id));
+}
+
+/** Các buổi của 1 lớp trong khoảng ngày — lọc theo mã buổi (`lớp_ngày_giờ`), không cần tạo index. */
+export function sessionsQuery(classId: string, from: string, to: string) {
+  return query(
+    collection(getDb(), "sessions"),
+    where(documentId(), ">=", `${classId}_${from}`),
+    where(documentId(), "<=", `${classId}_${to}_9999`),
+  );
 }

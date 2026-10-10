@@ -5,8 +5,8 @@ import { usePathname } from "next/navigation";
 import { IconChart, IconClasses, IconMoney, IconSettings, IconToday } from "./icons";
 
 const TABS = [
-  { href: "/", label: "Hôm nay", Icon: IconToday },
-  { href: "/lop", label: "Lớp học", Icon: IconClasses },
+  { href: "/", label: "Hôm nay", Icon: IconToday, also: ["/diem-danh"] },
+  { href: "/lop", label: "Lớp học", Icon: IconClasses, also: ["/buoi-hoc"] },
   { href: "/hoc-phi", label: "Học phí", Icon: IconMoney },
   { href: "/tong-quan", label: "Tổng quan", Icon: IconChart },
   { href: "/cai-dat", label: "Cài đặt", Icon: IconSettings },
@@ -17,8 +17,9 @@ export function BottomNav() {
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-brand-100 bg-white/95 backdrop-blur pb-safe" aria-label="Điều hướng chính">
       <ul className="mx-auto grid max-w-lg grid-cols-5">
-        {TABS.map(({ href, label, Icon }) => {
-          const active = href === "/" ? path === "/" : path.startsWith(href);
+        {TABS.map(({ href, label, Icon, ...rest }) => {
+          const also = "also" in rest ? (rest.also as string[]) : [];
+          const active = (href === "/" ? path === "/" : path.startsWith(href)) || also.some((a) => path.startsWith(a));
           return (
             <li key={href}>
               <Link
