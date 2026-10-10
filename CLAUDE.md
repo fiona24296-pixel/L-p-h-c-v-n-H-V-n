@@ -7,11 +7,21 @@ Web app (PWA, dùng chủ yếu trên điện thoại) giúp cô giáo dạy th�
 Người dùng **không biết lập trình**: mọi giải thích, giao diện, thông báo lỗi đều bằng **tiếng Việt đơn giản**.
 Khi cần cô thao tác (tạo tài khoản, lấy khóa, deploy) → hướng dẫn từng cú click.
 
+## ⚠ Quyền riêng tư — repo GitHub đang CÔNG KHAI
+- **Không bao giờ commit dữ liệu học sinh thật** (tên, SĐT, phụ huynh, file .xlsx của cô). `.gitignore` đã chặn `*.xlsx`.
+- Không ghi email giáo viên vào code/commit. Security Rules dùng chỗ giữ chỗ `__TEACHER_EMAIL__`;
+  bản có email thật tạo bằng `node scripts/make-rules.mjs <email>` rồi gửi cô dán vào Firebase Console.
+- Test/e2e chỉ dùng dữ liệu giả (`e2e/make-fixture.mjs`).
+
 ## Cách làm việc
 - Làm theo giai đoạn (bên dưới). Xong mỗi giai đoạn: `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`,
   chạy thử trên trình duyệt khổ điện thoại (Playwright, 390×844), chụp ảnh màn hình gửi cô, **chờ cô duyệt** rồi mới sang giai đoạn sau.
 - Cập nhật mục "Tiến độ" ở cuối file này sau mỗi giai đoạn.
 - Branch phát triển: `claude/lop-van-co-ha-van-wx8bx0`.
+- Next.js 16.4 có thay đổi so với kiến thức cũ — đọc `node_modules/next/dist/docs/` trước khi dùng API lạ (xem AGENTS.md).
+- Chạy thử trên máy: `npm run emulators` (Firebase Auth + Firestore giả lập, cần Java) rồi `next dev` với
+  `.env.local` có `NEXT_PUBLIC_USE_EMULATOR=1` → màn đăng nhập có nút "Đăng nhập thử" (email `test@lopvan.local`).
+  Kịch bản kiểm thử giao diện: `CHROMIUM_PATH=... node e2e/phase1.mjs <thư-mục-ảnh>`.
 
 ## Công nghệ
 - Next.js (App Router) + TypeScript (strict) + Tailwind CSS. Mobile-first. PWA (manifest + service worker).
@@ -20,7 +30,7 @@ Khi cần cô thao tác (tạo tài khoản, lấy khóa, deploy) → hướng d
 - AI: Gemini API (gói miễn phí, model flash) gọi qua **Route Handler phía server** (`app/api/ai/...`).
   Khóa `GEMINI_API_KEY` chỉ nằm trong biến môi trường server, không bao giờ có tiền tố `NEXT_PUBLIC_`.
   API route xác thực Firebase ID token (verify JWT bằng `jose` + JWKS công khai của Google, không cần service account) và kiểm tra email.
-- Excel: `exceljs` (đọc/ghi .xlsx). Ảnh phiếu: `html-to-image`. ZIP: `jszip`. QR: tự sinh chuỗi VietQR (EMVCo, có CRC16) + thư viện `qrcode`.
+- Excel: `exceljs` (đọc/ghi .xlsx, import động để không làm nặng app). Ảnh phiếu: `html-to-image`. ZIP: `jszip`. QR: tự sinh chuỗi VietQR (EMVCo, có CRC16) + thư viện `qrcode`.
 - Test: `vitest` cho các hàm thuần (tính học phí, VietQR, bỏ dấu, nhập Excel).
 - Deploy: Vercel (gói Hobby miễn phí).
 
@@ -33,7 +43,18 @@ Khi cần cô thao tác (tạo tài khoản, lấy khóa, deploy) → hướng d
 - Mọi mức giá / kỳ thu / quy tắc / thẻ nhận xét / lịch lớp đọc từ `settings`, không viết cứng (chỉ có giá trị mặc định).
 - Tên biến/hàm tiếng Anh; chữ hiển thị tiếng Việt.
 
-## Mô hình dữ liệu Firestore (dự kiến)
+## File Excel
+- Mẫu chuẩn: sheet **"Hoc sinh"** (12 cột như yêu cầu) + **"Lop hoc"** (Mã lớp | Tên lớp | Khối | Lịch học | Cách tính học phí),
+  lịch dạng `T4 17:00-19:00; T7 17:00-19:00`. Đọc: `src/lib/excel-import.ts`; ghi: `src/lib/excel-export.ts`.
+- File gốc của cô KHÁC mẫu: mỗi lớp 1 sheet (TH, V6, V7, V8, V9.1, V9.2), mỗi sheet có 4 khối:
+  danh sách (STT | Tên | Trường | Lớp | PH | Zalo | SĐT | Ghi chú), bảng điểm danh (cột là ngày, "*" có mặt, "Vắng", "-"),
+  bảng nhận xét, bảng đóng tiền theo tháng ("X" = đã đóng?). Không có Mã HS, SĐT hay bị mất số 0.
+  Đã chuyển 1 lần sang mẫu chuẩn (137 em), mã HS dạng `TH-01`, `V6-01`, `V91-01`, `V92-01`… Mã lớp: TH, V6, V7, V8, V91, V92.
+- Ô "Cần kiểm tra": app tự phát hiện thiếu SĐT / SĐT sai / thiếu tên PH / thiếu lớp ở trường (`student-warnings.ts`)
+  nên khi nhập sẽ bỏ các mục đó khỏi ô, chỉ giữ ghi chú riêng của cô → bổ sung xong thì ⚠ tự mất.
+- Văn phong nhận xét mẫu của cô: `docs/van-phong-nhan-xet.md` (dùng cho Giai đoạn 3).
+
+## Mô hình dữ liệu Firestore
 - `settings/main`: thông tin GV, ngân hàng, câu cảm ơn, mức học phí, kỳ thu, quy tắc vắng, thẻ nhận xét.
 - `classes/{classId}`: tên, khối (tieu_hoc | 6 | 7 | 8 | 9), lịch [{thứ, giờ bắt đầu, giờ kết thúc}], học phí theo tháng hay theo buổi.
 - `students/{maHS}`: họ tên, classId, khối, trường, lớp ở trường, phụ huynh, zalo, sđt, cách tính học phí, ghi chú,
@@ -70,4 +91,10 @@ Khi cần cô thao tác (tạo tài khoản, lấy khóa, deploy) → hướng d
 6. Deploy Vercel + hướng dẫn cài PWA lên điện thoại.
 
 ## Tiến độ
-- [ ] Giai đoạn 1 — đang chờ cô duyệt kế hoạch.
+- [x] Giai đoạn 1 — khung app, đăng nhập Google (kiểm tra quyền bằng cách đọc thử `settings/main`: Rules từ chối → đăng xuất,
+  báo "không có quyền"), PWA (manifest + `public/sw.js`), nhập Excel (xem trước → nhập, upsert theo Mã HS),
+  danh sách học sinh (lọc lớp, tìm không dấu, ⚠ cần kiểm tra, đã nghỉ), thêm/sửa/xóa/chuyển lớp/nghỉ học,
+  Hôm nay (ca theo lịch), Cài đặt (nhập/tải Excel, lịch lớp, đăng xuất). **Chờ cô duyệt + tạo Firebase.**
+- Ghi theo kiểu "lạc quan": ghi vào bộ nhớ đệm Firestore rồi đóng form ngay (mạng yếu vẫn dùng được).
+- Câu hỏi còn chờ cô trả lời: email đăng nhập (đang giả định Gmail của tài khoản Claude của cô — không ghi vào repo), quy tắc "buổi lẻ" THCS,
+  "Học bù" tính như có mặt?, Vercel, có deploy sớm để thử trên điện thoại không.

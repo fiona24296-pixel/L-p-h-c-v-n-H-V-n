@@ -1,0 +1,51 @@
+rules_version = '2';
+
+// Chỉ đúng 1 tài khoản Google của cô giáo được đọc/ghi dữ liệu.
+// Email trong isTeacher() là chỗ giữ chỗ; tạo bản có email thật để dán vào Firebase Console bằng:
+//   node scripts/make-rules.mjs email-cua-co@gmail.com
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isTeacher() {
+      return request.auth != null
+        && request.auth.token.email == '__TEACHER_EMAIL__'
+        && request.auth.token.email_verified == true;
+    }
+
+    function validStudent() {
+      let d = request.resource.data;
+      return d.name is string && d.name.size() > 0 && d.name.size() <= 100
+        && d.classId is string
+        && d.phone is string
+        && d.status in ['active', 'inactive'];
+    }
+
+    match /settings/{id} {
+      allow read, write: if isTeacher();
+    }
+    match /classes/{id} {
+      allow read, delete: if isTeacher();
+      allow create, update: if isTeacher() && request.resource.data.name is string;
+    }
+    match /students/{id} {
+      allow read, delete: if isTeacher();
+      allow create, update: if isTeacher() && id.size() <= 40 && validStudent();
+    }
+    match /sessions/{id} {
+      allow read, write: if isTeacher();
+    }
+    match /periodComments/{id} {
+      allow read, write: if isTeacher();
+    }
+    match /roadmaps/{id} {
+      allow read, write: if isTeacher();
+    }
+    match /fees/{id} {
+      allow read, write: if isTeacher();
+    }
+
+    // Mọi thứ khác: cấm.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
